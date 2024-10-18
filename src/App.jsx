@@ -54,7 +54,7 @@ const FinancialDataAnalyzer = () => {
       const fileContent = await readFileAsText(file);
       const jsonData = JSON.parse(fileContent);
 
-      const response = await fetch("http://localhost:3000/probe", {
+      const response = await fetch("https://karbon-assignment-7iwn.vercel.app/api/probe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
