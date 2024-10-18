@@ -4,7 +4,7 @@ import sys
 import os
 
 # Add the parent directory to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(_file_))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rules import (
     latest_financial_index,
@@ -14,7 +14,7 @@ from rules import (
     borrowing_to_revenue_flag,
 )
 
-app = Flask(_name_)
+app = Flask(__name__)
 CORS(app)
 
 
@@ -59,5 +59,5 @@ def probe():
 
 
 # This is only used when running locally. On Vercel, the server is started automatically.
-if _name_ == "_main_":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000, debug=True)
