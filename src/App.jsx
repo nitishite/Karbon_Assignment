@@ -1,33 +1,82 @@
-import React, { useState } from 'react';
-import { Upload, XCircleIcon } from 'lucide-react';
+import { useState } from "react";
+import "./App.css";
 
-const App = () => {
-  const [fileName, setFileName] = useState('');
-  const [jsonData, setJsonData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setFileName(file.name);
-      try {
-        const content = await readFileContent(file);
-        const parsedData = JSON.parse(content);
-        setJsonData(parsedData);
-        setError('');
-      } catch (err) {
-        setError('Error parsing JSON file. Please ensure it\'s a valid JSON.');
-        setJsonData(null);
+const syntaxHighlight = (json) => {
+  if (typeof json !== "string") {
+    json = JSON.stringify(json, null, 2);
+  }
+  json = json
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return json.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])"(\s:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    function (match) {
+      let cls = "number";
+      if (/^"/.test(match)) {
+        if (/:$/.test(match)) {
+          cls = "key";
+        } else {
+          cls = "string";
+        }
+      } else if (/true|false/.test(match)) {
+        cls = "boolean";
+      } else if (/null/.test(match)) {
+        cls = "null";
       }
-    } else {
-      setFileName('');
-      setJsonData(null);
-      setError('');
+      return '<span class="' + cls + '">' + match + "</span>";
+    }
+  );
+};
+
+export default function App() {
+  const [file, setFile] = useState(null);
+  const [response, setResponse] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);
+    setResponse(null);
+    setError(null);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!file) {
+      setError("Please select a file to upload.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const fileContent = await readFileAsText(file);
+      const jsonData = JSON.parse(fileContent);
+
+      const response = await fetch("http://localhost:3000/probe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(jsonData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Server responded with an error");
+      }
+
+      const result = await response.json();
+      setResponse(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const readFileContent = (file) => {
+  const readFileAsText = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (event) => resolve(event.target.result);
@@ -36,88 +85,36 @@ const App = () => {
     });
   };
 
-  const clearFile = () => {
-    setFileName('');
-    setJsonData(null);
-    setError('');
-  };
-
-  const handleSubmit = async () => {
-    if (!jsonData) {
-      setError('Please upload a valid JSON file before submitting.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('https://api.example.com/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(jsonData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const result = await response.json();
-      console.log('Upload successful:', result);
-      // Handle successful upload (e.g., show a success message)
-    } catch (err) {
-      setError('Error uploading data: ' + err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-indigo-200 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <h2 className="text-3xl font-bold text-gray-800 mb-6">Model Upload</h2>
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Upload your data</label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-            <div className="space-y-1 text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="flex text-sm text-gray-600">
-                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                  <span>Upload a file</span>
-                  <input id="file-upload" name="file-upload" type="file" accept=".json" className="sr-only" onChange={handleFileChange} />
-                </label>
-                <p className="pl-1">or drag and drop</p>
-              </div>
-              <p className="text-xs text-gray-500">JSON up to 10MB</p>
-            </div>
-          </div>
-          {fileName && (
-            <div className="mt-2 flex items-center justify-between bg-indigo-50 p-2 rounded-md">
-              <span className="text-sm text-indigo-700 truncate">{fileName}</span>
-              <button onClick={clearFile} className="text-indigo-600 hover:text-indigo-800">
-                <XCircleIcon className="h-5 w-5" />
-              </button>
-            </div>
-          )}
-          {error && (
-            <p className="mt-2 text-sm text-red-600">{error}</p>
-          )}
+    <div className="container">
+      <h1>Financial Data Analyzer</h1>
+      <form onSubmit={handleSubmit}>
+        <div className="file-input-container">
+          <input
+            type="file"
+            onChange={handleFileChange}
+            accept=".json"
+            id="file-input"
+          />
+          <label htmlFor="file-input" className="file-input-label">
+            {file ? file.name : "Choose JSON file"}
+          </label>
         </div>
-        <button 
-          onClick={handleSubmit}
-          disabled={isLoading || !jsonData}
-          className={`w-full px-4 py-2 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-300 flex items-center justify-center
-            ${isLoading || !jsonData 
-              ? 'bg-indigo-300 text-white cursor-not-allowed' 
-              : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-        >
-          {isLoading ? 'Uploading...' : 'Upload Model'}
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? "Processing..." : "Analyze"}
         </button>
-      </div>
+      </form>
+
+      {error && <div className="error">{error}</div>}
+
+      {response && (
+        <div className="response">
+          <h2>Analysis Results</h2>
+          <pre
+            dangerouslySetInnerHTML={{ __html: syntaxHighlight(response) }}
+          />
+        </div>
+      )}
     </div>
   );
-};
-
-export default App;
+}
