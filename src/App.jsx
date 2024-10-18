@@ -3,14 +3,75 @@ import { Upload, XCircleIcon } from 'lucide-react';
 
 const App = () => {
   const [fileName, setFileName] = useState('');
+  const [jsonData, setJsonData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
-    setFileName(file ? file.name : '');
+    if (file) {
+      setFileName(file.name);
+      try {
+        const content = await readFileContent(file);
+        const parsedData = JSON.parse(content);
+        setJsonData(parsedData);
+        setError('');
+      } catch (err) {
+        setError('Error parsing JSON file. Please ensure it\'s a valid JSON.');
+        setJsonData(null);
+      }
+    } else {
+      setFileName('');
+      setJsonData(null);
+      setError('');
+    }
+  };
+
+  const readFileContent = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target.result);
+      reader.onerror = (error) => reject(error);
+      reader.readAsText(file);
+    });
   };
 
   const clearFile = () => {
     setFileName('');
+    setJsonData(null);
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!jsonData) {
+      setError('Please upload a valid JSON file before submitting.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('https://api.example.com/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jsonData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      // Handle successful upload (e.g., show a success message)
+    } catch (err) {
+      setError('Error uploading data: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -25,7 +86,7 @@ const App = () => {
               <div className="flex text-sm text-gray-600">
                 <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
                   <span>Upload a file</span>
-                  <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} />
+                  <input id="file-upload" name="file-upload" type="file" accept=".json" className="sr-only" onChange={handleFileChange} />
                 </label>
                 <p className="pl-1">or drag and drop</p>
               </div>
@@ -40,9 +101,19 @@ const App = () => {
               </button>
             </div>
           )}
+          {error && (
+            <p className="mt-2 text-sm text-red-600">{error}</p>
+          )}
         </div>
-        <button className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-300 flex items-center justify-center">
-          Upload Model
+        <button 
+          onClick={handleSubmit}
+          disabled={isLoading || !jsonData}
+          className={`w-full px-4 py-2 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-300 flex items-center justify-center
+            ${isLoading || !jsonData 
+              ? 'bg-indigo-300 text-white cursor-not-allowed' 
+              : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+        >
+          {isLoading ? 'Uploading...' : 'Upload Model'}
         </button>
       </div>
     </div>
